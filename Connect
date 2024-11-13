@@ -1,0 +1,61 @@
+import threading
+import subprocess
+import time
+import os
+
+class Bot:
+
+    def __init__(self):
+        self.running_threads = []
+        self.shutdown_flag = threading.Event()
+
+    def add_thread(self, thread):
+        self.running_threads.append(thread)
+
+    def shutdown(self):
+        print("The threads are being severed.")
+        self.shutdown_flag.set()
+        for thread in self.running_threads:
+            if thread != threading.current_thread():
+                thread.join(timeout=1)
+        print("The threads have been severed.")
+
+def run_python_file(file, bot):
+    try:
+        result = subprocess.run(['python', '-Xfrozen_modules=off', file], check=True, capture_output=True, text=True)
+        print(f"Output of {file}:\n{result.stdout}")
+    except subprocess.CalledProcessError as e:
+        print(f"Error running {file}:\n{e.stderr}")
+    finally:
+        if bot.shutdown_flag.is_set():
+            print(f"{file} thread is shutting down.")
+
+def listen_for_shutdown(bot):
+    while not bot.shutdown_flag.is_set():
+        time.sleep(0.1)
+
+neural_directory = r'C:\neural\filepath\here'
+files_to_run = [
+    f'{neural_directory}\\test.py',
+    f'{neural_directory}\\test.py'
+]
+
+neural = Bot()
+
+threads = []
+for file in files_to_run:
+    thread = threading.Thread(target=run_python_file, args=(file, neural))
+    threads.append(thread)
+    neural.add_thread(thread)
+
+shutdown_thread = threading.Thread(target=listen_for_shutdown, args=(neural,))
+neural.add_thread(shutdown_thread)
+shutdown_thread.start()
+
+for thread in threads:
+    thread.start()
+
+for thread in threads:
+    thread.join()
+
+neural.shutdown()
